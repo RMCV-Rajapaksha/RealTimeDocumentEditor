@@ -1,6 +1,21 @@
 import React, { useRef, useEffect } from 'react';
 import "quill/dist/quill.snow.css";
 import Quill from "quill";
+import "../styles.css";
+
+
+const TOOLBAR_OPTIONS = [
+    [{ header: [1, 2, 3, 4, 5, 6, false] }],
+    [{ font: [] }],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["bold", "italic", "underline"],
+    [{ color: [] }, { background: [] }],
+    [{ script: "sub" }, { script: "super" }],
+    [{ align: [] }],
+    ["image", "blockquote", "code-block"],
+    ["clean"],
+    ["link"],
+];
 
 function TextEditor() {
     const wrapperRef = useRef(null);
@@ -12,7 +27,7 @@ function TextEditor() {
         const editor = document.createElement("div");
         wrapperRef.current.appendChild(editor);
         new Quill(editor, {
-            theme: "snow",
+            theme: "snow", modules: { toolbar: TOOLBAR_OPTIONS }
         });
 
     }, []);
