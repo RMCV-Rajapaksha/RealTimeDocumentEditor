@@ -1,16 +1,20 @@
-import { Route, Routes } from "react-router-dom";
-import PublicLayout from "./component/layout/PublicLayout";
-import Document from "./pages/Document";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { v4 as uuidV4 } from "uuid";
+import TextEditor from "./component/TextEditor"; // Import TextEditor component
 
 function App() {
   return (
-    <>
+    <Router>
       <Routes>
-        <Route element={<PublicLayout />}>
-          <Route path="document" element={<Document />} />
-        </Route>
+        <Route path="/" element={<Navigate to={`/documents/${uuidV4()}`} />} />
+        <Route path="/documents/:id" element={<TextEditor />} />
       </Routes>
-    </>
+    </Router>
   );
 }
 
