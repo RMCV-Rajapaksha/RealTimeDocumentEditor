@@ -3,20 +3,27 @@ import Quill from "quill";
 import "quill/dist/quill.snow.css";
 import { io } from "socket.io-client";
 import { useParams } from "react-router-dom";
+import { motion } from "framer-motion";
 
 const SAVE_INTERVAL_MS = 2000;
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
   [{ font: [] }],
   [{ list: "ordered" }, { list: "bullet" }],
-  ["bold", "italic", "underline"],
+  ["bold", "italic", "underline", "strike"], // Added strike
   [{ color: [] }, { background: [] }],
   [{ script: "sub" }, { script: "super" }],
   [{ align: [] }],
   ["image", "blockquote", "code-block"],
-  ["clean"],
+  ["link", "video"], // Added link and video
+  ["clean"], // Remove formatting button
+  [{ 'direction': 'rtl' }], // Text direction
+  [{ 'indent': '-1'}, { 'indent': '+1' }], // Indent
+  [{ 'size': ['small', false, 'large', 'huge'] }], // Font size
+  [{ 'header': '1'}, { 'header': '2' }], // Custom button values
+  [{ 'font': [] }],
+  [{ 'align': [] }],
 ];
-
 export default function TextEditor() {
   const { id: documentId } = useParams();
   const [socket, setSocket] = useState();
@@ -42,17 +49,6 @@ export default function TextEditor() {
     socket.emit("get-document", documentId);
   }, [socket, quill, documentId]);
 
-  useEffect(() => {
-    if (socket == null || quill == null) return;
-
-    const interval = setInterval(() => {
-      socket.emit("save-document", quill.getContents());
-    }, SAVE_INTERVAL_MS);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [socket, quill]);
   useEffect(() => {
     if (socket == null || quill == null) return;
 
@@ -107,5 +103,14 @@ export default function TextEditor() {
     setQuill(q);
   }, []);
   
-  return <div className="container" ref={wrapperRef}></div>;
+  return (
+    <motion.div 
+      className="container p-4 mx-auto"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="p-4 bg-white rounded-lg shadow-md" ref={wrapperRef}></div>
+    </motion.div>
+  );
 }
