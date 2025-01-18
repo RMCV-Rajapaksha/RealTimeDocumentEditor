@@ -4,6 +4,7 @@ import "quill/dist/quill.snow.css";
 import { io } from "socket.io-client";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import ChatComponent from "./ChatComponent";
 
 const SAVE_INTERVAL_MS = 2000;
 const TOOLBAR_OPTIONS = [
@@ -24,6 +25,7 @@ const TOOLBAR_OPTIONS = [
   [{ 'font': [] }],
   [{ 'align': [] }],
 ];
+
 export default function TextEditor() {
   const { id: documentId } = useParams();
   const [socket, setSocket] = useState();
@@ -111,6 +113,7 @@ export default function TextEditor() {
       transition={{ duration: 0.5 }}
     >
       <div className="p-4 bg-white rounded-lg shadow-md" ref={wrapperRef}></div>
+      <ChatComponent />
     </motion.div>
   );
 }
