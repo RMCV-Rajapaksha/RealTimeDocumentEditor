@@ -107,12 +107,12 @@ export default function TextEditor() {
   
   return (
     <motion.div 
-      className="container p-4 mx-auto"
+      className="container mx-auto p-4"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="p-4 bg-white rounded-lg shadow-md" ref={wrapperRef}></div>
+      <div className="bg-white rounded-lg shadow-md p-4 mb-4" ref={wrapperRef}></div>
       <ChatComponent />
     </motion.div>
   );
