@@ -122,21 +122,34 @@ public class DocumentClient extends Application {
 
     private void handleTextChange(String oldText, String newText) {
         int caretPosition = textArea.getCaretPosition();
-        if (newText.length() > oldText.length()) {
-            // Text was inserted
+
+        // More robust change detection
+        if (!Objects.equals(oldText, newText)) {
             int start = findDifferenceStart(oldText, newText);
-            String insertedText = newText.substring(start);
-            EditMessage message = new EditMessage(userId, EditMessage.MessageType.EDIT, insertedText, start,
+            int end = findDifferenceEnd(oldText, newText);
+
+            String changedText = newText.substring(start, newText.length());
+            EditMessage message = new EditMessage(
+                    userId,
+                    changedText.isEmpty() ? EditMessage.MessageType.EDIT : EditMessage.MessageType.EDIT,
+                    changedText,
+                    start,
                     EditMessage.TextStyle.NORMAL);
-            sendMessage(message);
-        } else if (newText.length() < oldText.length()) {
-            // Text was deleted
-            int start = findDifferenceStart(newText, oldText);
-            String deletedText = oldText.substring(start);
-            EditMessage message = new EditMessage(userId, EditMessage.MessageType.EDIT, "", start,
-                    EditMessage.TextStyle.NORMAL);
+
             sendMessage(message);
         }
+    }
+
+    private int findDifferenceEnd(String oldText, String newText) {
+        int oldLen = oldText.length();
+        int newLen = newText.length();
+
+        for (int i = 1; i <= Math.min(oldLen, newLen); i++) {
+            if (oldText.charAt(oldLen - i) != newText.charAt(newLen - i)) {
+                return newLen - i + 1;
+            }
+        }
+        return Math.min(oldLen, newLen);
     }
 
     private int findDifferenceStart(String oldText, String newText) {

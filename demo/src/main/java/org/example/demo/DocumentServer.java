@@ -39,12 +39,15 @@ public class DocumentServer {
     }
 
     public synchronized void broadcastMessage(EditMessage message, String senderId) {
-        documentState.applyEdit(message);
+        // First broadcast the message to all clients
         clients.forEach((clientId, handler) -> {
             if (!clientId.equals(senderId)) {
                 handler.sendMessage(message);
             }
         });
+        
+        // Then apply the edit to the document state
+        documentState.applyEdit(message);
     }
 
     public void removeClient(String clientId) {
