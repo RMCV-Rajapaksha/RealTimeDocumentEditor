@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Collaborative Editor</title>
+    <style>
+      .editor-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .editor-textarea {
+        width: 100%;
+        height: 400px;
+        padding: 10px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+      .info-text {
+        color: #666;
+        margin: 10px 0;
+      }
+      .user-section {
+        margin-bottom: 20px;
+        padding: 10px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+      }
+      .active-users {
+        margin-top: 10px;
+        padding: 10px;
+        background-color: #e8f5e9;
+        border-radius: 4px;
+      }
+      .copy-button {
+        padding: 5px 10px;
+        margin-left: 10px;
+        cursor: pointer;
+      }
+      .status-indicator {
+        height: 10px;
+        width: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+      }
+      .status-connected {
+        background-color: #4caf50;
+      }
+      .status-disconnected {
+        background-color: #f44336;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="editor-container">
+      <h1>Collaborative Document Editor</h1>
+
+      <!-- User Section -->
+      <div class="user-section">
+        <label for="username">Your Name:</label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          value="Anonymous User"
+        />
+        <div class="connection-status">
+          Status: <span class="status-indicator"></span>
+          <span id="connection-text">Connecting...</span>
+        </div>
+      </div>
+
+      <!-- Document Info Section -->
+      <div class="info-text">
+        <label for="document-id">Document ID:</label>
+        <span
+          id="document-id"
+          th:text="${document != null ? document.id : 'Not Available'}"
+          >ID</span
+        >
+        <button class="copy-button" onclick="copyDocumentUrl()">
+          Copy URL to Share
+        </button>
+      </div>
+
+      <!-- Active Users Section -->
+      <div class="active-users">
+        <h3>Currently Editing:</h3>
+        <ul id="active-users-list"></ul>
+      </div>
+
+      <!-- Editor Section -->
+      <label for="editor">Document Content:</label>
+      <textarea
+        id="editor"
+        name="editor"
+        class="editor-textarea"
+        th:text="${document != null ? document.content : ''}"
+        aria-label="Document content editor"
+      >
+      </textarea>
+
+      <!-- Last Editor Info -->
+      <div class="info-text">
+        <label for="last-editor">Last edited by:</label>
+        <span
+          id="last-editor"
+          th:text="${document != null ? document.lastEditor : 'No edits yet'}"
+          >Editor Name</span
+        >
+      </div>
+    </div>
+
+    <script th:inline="javascript">
+      const documentData = /*[[${document}]]*/ null;
+      const documentId = documentData ? documentData.id : null;
+      let activeUsers = new Set();
+
+      if (!documentId) {
+        console.error("No document ID found");
+        window.location.href = "/documents/new";
+      }
+
+      const editor = document.getElementById("editor");
+      const lastEditor = document.getElementById("last-editor");
+      const usernameInput = document.getElementById("username");
+      const activeUsersList = document.getElementById("active-users-list");
+      const statusIndicator = document.querySelector(".status-indicator");
+      const connectionText = document.getElementById("connection-text");
+      let socket;
+
+      function updateConnectionStatus(connected) {
+        statusIndicator.className =
+          "status-indicator " +
+          (connected ? "status-connected" : "status-disconnected");
+        connectionText.textContent = connected ? "Connected" : "Disconnected";
+      }
+
+      function updateActiveUsers() {
+        activeUsersList.innerHTML = "";
+        activeUsers.forEach((user) => {
+          const li = document.createElement("li");
+          li.textContent = user;
+          activeUsersList.appendChild(li);
+        });
+      }
+
+      function copyDocumentUrl() {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+          alert(
+            "URL copied to clipboard! Share this with others to collaborate."
+          );
+        });
+      }
+
+      function connectToServer() {
+        socket = new WebSocket(`ws://${window.location.host}/document-ws`);
+
+        socket.onopen = () => {
+          console.log("Connected to server");
+          updateConnectionStatus(true);
+          sendUserUpdate("join");
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const response = JSON.parse(event.data);
+            if (response.documentId === documentId) {
+              if (response.type === "user_update") {
+                if (response.action === "join") {
+                  activeUsers.add(response.username);
+                } else if (response.action === "leave") {
+                  activeUsers.delete(response.username);
+                }
+                updateActiveUsers();
+              } else {
+                editor.value = response.content;
+                lastEditor.textContent = response.editor;
+              }
+            }
+          } catch (error) {
+            console.error("Error processing message:", error);
+          }
+        };
+
+        socket.onclose = () => {
+          console.log("Connection closed. Reconnecting...");
+          updateConnectionStatus(false);
+          setTimeout(connectToServer, 1000);
+        };
+
+        socket.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          updateConnectionStatus(false);
+        };
+      }
+
+      function sendUserUpdate(action) {
+        const update = {
+          type: "user_update",
+          documentId: documentId,
+          username: usernameInput.value,
+          action: action,
+        };
+        socket.send(JSON.stringify(update));
+      }
+
+      let editTimeout;
+      editor.addEventListener("input", () => {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          console.warn("Socket not connected. Attempting to reconnect...");
+          connectToServer();
+          return;
+        }
+
+        // Clear existing timeout
+        clearTimeout(editTimeout);
+
+        // Set new timeout to send update
+        editTimeout = setTimeout(() => {
+          const edit = {
+            documentId: documentId,
+            content: editor.value,
+            editor: usernameInput.value,
+            timestamp: Date.now(),
+          };
+
+          try {
+            socket.send(JSON.stringify(edit));
+          } catch (error) {
+            console.error("Error sending edit:", error);
+          }
+        }, 500); // Wait 500ms after last edit before sending
+      });
+
+      usernameInput.addEventListener("change", () => {
+        sendUserUpdate("join");
+      });
+
+      // Handle page unload
+      window.addEventListener("beforeunload", () => {
+        sendUserUpdate("leave");
+      });
+
+      // Initial connection
+      connectToServer();
+    </script>
+  </body>
+</html>
