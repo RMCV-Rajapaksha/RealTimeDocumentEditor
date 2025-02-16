@@ -20,6 +20,7 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
     private final ConcurrentHashMap<String, Set<WebSocketSession>> documentSessions;
     private final DocumentService documentService;
     private final ObjectMapper objectMapper;
+    private final ConcurrentHashMap<String, Long> lastUpdateTimes;
 
     public DocumentWebSocketHandler(DocumentService documentService) {
         this.documentService = documentService;
@@ -34,14 +35,15 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
                     Thread t = new Thread(r, "ws-processor-" + r.hashCode());
                     t.setDaemon(true);
                     return t;
-                }
-        );
+                });
         this.documentSessions = new ConcurrentHashMap<>();
+        this.lastUpdateTimes = new ConcurrentHashMap<>();
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         log.info("WebSocket connection established: {}", session.getId());
+        session.setTextMessageSizeLimit(65536); // Increase message size limit if needed
     }
 
     @Override
@@ -49,13 +51,23 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
         messageProcessorPool.submit(() -> {
             try {
                 DocumentEdit edit = parseMessage(message.getPayload());
+                String documentId = edit.getDocumentId();
+
+                // Rate limiting check
+                Long lastUpdate = lastUpdateTimes.get(documentId);
+                long now = System.currentTimeMillis();
+                if (lastUpdate != null && now - lastUpdate < 50) { // 50ms minimum between updates
+                    return;
+                }
+                lastUpdateTimes.put(documentId, now);
+
+                // Process the update
                 documentService.updateDocument(edit.getDocumentId(), edit.getContent(), edit.getEditor());
 
                 // Register session with document
                 documentSessions.computeIfAbsent(
-                        edit.getDocumentId(),
-                        k -> ConcurrentHashMap.newKeySet()
-                ).add(session);
+                        documentId,
+                        k -> ConcurrentHashMap.newKeySet()).add(session);
 
                 // Broadcast to other sessions
                 broadcastUpdate(session, edit);
@@ -77,17 +89,24 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
         return objectMapper.readValue(payload, DocumentEdit.class);
     }
 
-    private String convertToJson(DocumentEdit edit) throws IOException {
-        return objectMapper.writeValueAsString(edit);
-    }
-
     private void broadcastUpdate(WebSocketSession sender, DocumentEdit edit) {
         Set<WebSocketSession> sessions = documentSessions.get(edit.getDocumentId());
         if (sessions != null) {
+            String message;
+            try {
+                message = objectMapper.writeValueAsString(edit);
+            } catch (IOException e) {
+                log.error("Error serializing edit message", e);
+                return;
+            }
+
+            TextMessage textMessage = new TextMessage(message);
             sessions.forEach(session -> {
                 if (session.isOpen() && session != sender) {
                     try {
-                        session.sendMessage(new TextMessage(convertToJson(edit)));
+                        synchronized (session) {
+                            session.sendMessage(textMessage);
+                        }
                     } catch (IOException e) {
                         log.error("Error broadcasting update", e);
                     }

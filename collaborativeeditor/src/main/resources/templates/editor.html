@@ -4,20 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Collaborative Editor</title>
+    <!-- Add Quill Theme CSS -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
     <style>
       .editor-container {
         max-width: 800px;
         margin: 0 auto;
         padding: 20px;
       }
-      .editor-textarea {
-        width: 100%;
+      #editor-wrapper {
         height: 400px;
-        padding: 10px;
         margin: 10px 0;
         border: 1px solid #ccc;
+      }
+      .ql-editor {
         font-family: Arial, sans-serif;
         font-size: 14px;
+        min-height: 350px;
       }
       .info-text {
         color: #666;
@@ -52,6 +55,14 @@
       }
       .status-disconnected {
         background-color: #f44336;
+      }
+      /* Fix Quill toolbar positioning */
+      .ql-toolbar.ql-snow {
+        border: 1px solid #ccc;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 1000;
       }
     </style>
   </head>
@@ -93,16 +104,9 @@
         <ul id="active-users-list"></ul>
       </div>
 
-      <!-- Editor Section -->
-      <label for="editor">Document Content:</label>
-      <textarea
-        id="editor"
-        name="editor"
-        class="editor-textarea"
-        th:text="${document != null ? document.content : ''}"
-        aria-label="Document content editor"
-      >
-      </textarea>
+      <!-- Quill Editor Section -->
+      <label for="editor-wrapper">Document Content:</label>
+      <div id="editor-wrapper"></div>
 
       <!-- Last Editor Info -->
       <div class="info-text">
@@ -115,29 +119,68 @@
       </div>
     </div>
 
+    <!-- Add Quill JS -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    
     <script th:inline="javascript">
       const documentData = /*[[${document}]]*/ null;
       const documentId = documentData ? documentData.id : null;
       let activeUsers = new Set();
+      let quill;
+      let isReceivingUpdate = false;
 
       if (!documentId) {
         console.error("No document ID found");
         window.location.href = "/documents/new";
       }
 
-      const editor = document.getElementById("editor");
+      // Initialize Quill editor
+      quill = new Quill('#editor-wrapper', {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            ['clean']
+          ]
+        },
+        placeholder: 'Start typing here...'
+      });
+
+      // Disable editor until connection is established
+      quill.disable();
+
+      // Set initial content
+      if (documentData && documentData.content) {
+        try {
+          const content = JSON.parse(documentData.content);
+          quill.setContents(content);
+        } catch (e) {
+          quill.setText(documentData.content || '');
+        }
+      }
+
       const lastEditor = document.getElementById("last-editor");
       const usernameInput = document.getElementById("username");
       const activeUsersList = document.getElementById("active-users-list");
       const statusIndicator = document.querySelector(".status-indicator");
       const connectionText = document.getElementById("connection-text");
       let socket;
+      let lastUpdateTime = 0;
+      const UPDATE_DEBOUNCE = 100; // Minimum time between updates in ms
 
       function updateConnectionStatus(connected) {
         statusIndicator.className =
           "status-indicator " +
           (connected ? "status-connected" : "status-disconnected");
         connectionText.textContent = connected ? "Connected" : "Disconnected";
+        
+        // Enable/disable editor based on connection status
+        if (connected) {
+          quill.enable();
+        } else {
+          quill.disable();
+        }
       }
 
       function updateActiveUsers() {
@@ -179,8 +222,20 @@
                 }
                 updateActiveUsers();
               } else {
-                editor.value = response.content;
+                isReceivingUpdate = true;
+                try {
+                  const content = JSON.parse(response.content);
+                  const currentContents = quill.getContents();
+                  
+                  // Only update if content is different
+                  if (JSON.stringify(currentContents) !== JSON.stringify(content)) {
+                    quill.setContents(content);
+                  }
+                } catch (e) {
+                  console.error("Error applying update:", e);
+                }
                 lastEditor.textContent = response.editor;
+                isReceivingUpdate = false;
               }
             }
           } catch (error) {
@@ -201,41 +256,50 @@
       }
 
       function sendUserUpdate(action) {
-        const update = {
-          type: "user_update",
-          documentId: documentId,
-          username: usernameInput.value,
-          action: action,
-        };
-        socket.send(JSON.stringify(update));
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          const update = {
+            type: "user_update",
+            documentId: documentId,
+            username: usernameInput.value,
+            action: action,
+          };
+          socket.send(JSON.stringify(update));
+        }
       }
 
       let editTimeout;
-      editor.addEventListener("input", () => {
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-          console.warn("Socket not connected. Attempting to reconnect...");
-          connectToServer();
+      quill.on('text-change', function(delta, oldDelta, source) {
+        if (isReceivingUpdate || source !== 'user') {
           return;
         }
 
-        // Clear existing timeout
-        clearTimeout(editTimeout);
+        const now = Date.now();
+        if (now - lastUpdateTime < UPDATE_DEBOUNCE) {
+          clearTimeout(editTimeout);
+        }
 
-        // Set new timeout to send update
         editTimeout = setTimeout(() => {
+          if (!socket || socket.readyState !== WebSocket.OPEN) {
+            console.warn("Socket not connected. Attempting to reconnect...");
+            connectToServer();
+            return;
+          }
+
+          const contents = quill.getContents();
           const edit = {
             documentId: documentId,
-            content: editor.value,
+            content: JSON.stringify(contents),
             editor: usernameInput.value,
-            timestamp: Date.now(),
+            timestamp: now,
           };
 
           try {
             socket.send(JSON.stringify(edit));
+            lastUpdateTime = now;
           } catch (error) {
             console.error("Error sending edit:", error);
           }
-        }, 500); // Wait 500ms after last edit before sending
+        }, UPDATE_DEBOUNCE);
       });
 
       usernameInput.addEventListener("change", () => {

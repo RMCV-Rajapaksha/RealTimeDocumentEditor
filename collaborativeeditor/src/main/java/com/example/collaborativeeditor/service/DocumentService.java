@@ -27,4 +27,11 @@ public class DocumentService {
             document.setLastEditTime(System.currentTimeMillis());
         }
     }
+
+    public void setDocumentType(String id, String type) {
+        Document document = documents.get(id);
+        if (document != null) {
+            document.setDocumentType(type);
+        }
+    }
 }
