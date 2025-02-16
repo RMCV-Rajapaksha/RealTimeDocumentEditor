@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Collaborative Editor</title>
     <!-- Add Quill Theme CSS -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link
+      href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
+      rel="stylesheet"
+    />
     <style>
       .editor-container {
         max-width: 800px;
@@ -38,6 +41,26 @@
         background-color: #e8f5e9;
         border-radius: 4px;
       }
+      .active-users ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .active-users li {
+        padding: 5px 10px;
+        margin: 5px 0;
+        background-color: #fff;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+      }
+      .user-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #4caf50;
+        margin-right: 8px;
+      }
       .copy-button {
         padding: 5px 10px;
         margin-left: 10px;
@@ -55,14 +78,6 @@
       }
       .status-disconnected {
         background-color: #f44336;
-      }
-      /* Fix Quill toolbar positioning */
-      .ql-toolbar.ql-snow {
-        border: 1px solid #ccc;
-        position: sticky;
-        top: 0;
-        background: white;
-        z-index: 1000;
       }
     </style>
   </head>
@@ -121,7 +136,7 @@
 
     <!-- Add Quill JS -->
     <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
-    
+
     <script th:inline="javascript">
       const documentData = /*[[${document}]]*/ null;
       const documentId = documentData ? documentData.id : null;
@@ -135,16 +150,16 @@
       }
 
       // Initialize Quill editor
-      quill = new Quill('#editor-wrapper', {
-        theme: 'snow',
+      quill = new Quill("#editor-wrapper", {
+        theme: "snow",
         modules: {
           toolbar: [
-            ['bold', 'italic', 'underline'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            ['clean']
-          ]
+            ["bold", "italic", "underline"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["clean"],
+          ],
         },
-        placeholder: 'Start typing here...'
+        placeholder: "Start typing here...",
       });
 
       // Disable editor until connection is established
@@ -156,7 +171,7 @@
           const content = JSON.parse(documentData.content);
           quill.setContents(content);
         } catch (e) {
-          quill.setText(documentData.content || '');
+          quill.setText(documentData.content || "");
         }
       }
 
@@ -174,22 +189,29 @@
           "status-indicator " +
           (connected ? "status-connected" : "status-disconnected");
         connectionText.textContent = connected ? "Connected" : "Disconnected";
-        
-        // Enable/disable editor based on connection status
+
         if (connected) {
           quill.enable();
+          sendUserUpdate("join");
         } else {
           quill.disable();
         }
       }
 
-      function updateActiveUsers() {
+      function updateActiveUsers(users) {
         activeUsersList.innerHTML = "";
-        activeUsers.forEach((user) => {
-          const li = document.createElement("li");
-          li.textContent = user;
-          activeUsersList.appendChild(li);
-        });
+        if (Array.isArray(users)) {
+          users.forEach((username) => {
+            const li = document.createElement("li");
+            const indicator = document.createElement("span");
+            indicator.className = "user-indicator";
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = username;
+            li.appendChild(indicator);
+            li.appendChild(nameSpan);
+            activeUsersList.appendChild(li);
+          });
+        }
       }
 
       function copyDocumentUrl() {
@@ -207,7 +229,6 @@
         socket.onopen = () => {
           console.log("Connected to server");
           updateConnectionStatus(true);
-          sendUserUpdate("join");
         };
 
         socket.onmessage = (event) => {
@@ -215,20 +236,19 @@
             const response = JSON.parse(event.data);
             if (response.documentId === documentId) {
               if (response.type === "user_update") {
-                if (response.action === "join") {
-                  activeUsers.add(response.username);
-                } else if (response.action === "leave") {
-                  activeUsers.delete(response.username);
+                // Handle user list updates
+                if (response.users) {
+                  updateActiveUsers(Array.from(response.users));
                 }
-                updateActiveUsers();
               } else {
+                // Handle document content updates
                 isReceivingUpdate = true;
                 try {
                   const content = JSON.parse(response.content);
                   const currentContents = quill.getContents();
-                  
-                  // Only update if content is different
-                  if (JSON.stringify(currentContents) !== JSON.stringify(content)) {
+                  if (
+                    JSON.stringify(currentContents) !== JSON.stringify(content)
+                  ) {
                     quill.setContents(content);
                   }
                 } catch (e) {
@@ -268,8 +288,8 @@
       }
 
       let editTimeout;
-      quill.on('text-change', function(delta, oldDelta, source) {
-        if (isReceivingUpdate || source !== 'user') {
+      quill.on("text-change", function (delta, oldDelta, source) {
+        if (isReceivingUpdate || source !== "user") {
           return;
         }
 
