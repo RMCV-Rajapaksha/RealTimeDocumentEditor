@@ -10,74 +10,181 @@
       rel="stylesheet"
     />
     <style>
-      .editor-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
+      :root {
+        --primary: #4f46e5;
+        --primary-dark: #4338ca;
+        --success: #059669;
+        --danger: #dc2626;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
       }
-      #editor-wrapper {
-        height: 400px;
-        margin: 10px 0;
-        border: 1px solid #ccc;
-      }
-      .ql-editor {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-        min-height: 350px;
-      }
-      .info-text {
-        color: #666;
-        margin: 10px 0;
-      }
-      .user-section {
-        margin-bottom: 20px;
-        padding: 10px;
-        background-color: #f5f5f5;
-        border-radius: 4px;
-      }
-      .active-users {
-        margin-top: 10px;
-        padding: 10px;
-        background-color: #e8f5e9;
-        border-radius: 4px;
-      }
-      .active-users ul {
-        list-style: none;
-        padding: 0;
+
+      body {
+        font-family: "Poppins", sans-serif;
+        background: var(--gray-50);
         margin: 0;
+        color: var(--gray-800);
       }
-      .active-users li {
-        padding: 5px 10px;
-        margin: 5px 0;
-        background-color: #fff;
-        border-radius: 3px;
+
+      .editor-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      }
+
+      h1 {
+        font-size: 2rem;
+        color: var(--gray-800);
+        margin-bottom: 2rem;
+        border-bottom: 2px solid var(--gray-200);
+        padding-bottom: 1rem;
+      }
+
+      .user-section {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--gray-50);
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+      }
+
+      input[type="text"] {
+        padding: 0.75rem 1rem;
+        border: 1px solid var(--gray-200);
+        border-radius: 6px;
+        font-size: 0.95rem;
+        width: 250px;
+        transition: all 0.2s;
+      }
+
+      input[type="text"]:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+      }
+
+      .connection-status {
         display: flex;
         align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
       }
-      .user-indicator {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background-color: #4caf50;
-        margin-right: 8px;
-      }
-      .copy-button {
-        padding: 5px 10px;
-        margin-left: 10px;
-        cursor: pointer;
-      }
+
       .status-indicator {
-        height: 10px;
-        width: 10px;
+        height: 8px;
+        width: 8px;
         border-radius: 50%;
-        display: inline-block;
-        margin-right: 5px;
+        transition: background-color 0.3s ease;
       }
+
       .status-connected {
-        background-color: #4caf50;
+        background-color: var(--success);
       }
       .status-disconnected {
-        background-color: #f44336;
+        background-color: var(--danger);
+      }
+
+      .active-users {
+        background: #f0fdf4;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin: 1.5rem 0;
+      }
+
+      .active-users h3 {
+        color: #166534;
+        margin: 0 0 1rem 0;
+        font-size: 1.1rem;
+      }
+
+      #active-users-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+
+      #active-users-list li {
+        background: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      .user-indicator {
+        margin-right: 0.5rem;
+      }
+
+      #editor-wrapper {
+        border-radius: 8px;
+        border: 1px solid var(--gray-200);
+        margin: 1.5rem 0;
+      }
+
+      .ql-toolbar {
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+        border-color: var(--gray-200) !important;
+        background: var(--gray-50);
+      }
+
+      .ql-container {
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+        border-color: var(--gray-200) !important;
+        min-height: 400px;
+      }
+
+      .copy-button {
+        background: var(--primary);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .copy-button:hover {
+        background: var(--primary-dark);
+      }
+
+      .info-text {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: var(--gray-50);
+        border-radius: 6px;
+        margin: 1rem 0;
+      }
+
+      @media (max-width: 768px) {
+        .editor-container {
+          margin: 1rem;
+          padding: 1rem;
+        }
+
+        .user-section {
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        input[type="text"] {
+          width: 100%;
+        }
       }
     </style>
   </head>
