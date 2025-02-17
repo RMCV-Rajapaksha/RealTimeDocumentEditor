@@ -152,6 +152,7 @@ public class DocumentWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
+
     private void broadcastUpdate(WebSocketSession sender, Map<String, Object> edit) throws IOException {
         String documentId = (String) edit.get("documentId");
         Set<WebSocketSession> sessions = documentSessions.get(documentId);
